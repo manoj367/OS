@@ -1,0 +1,117 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <assert.h>
+char *toggleString(char *argv){
+int i;      
+char *str = malloc(sizeof(argv[1]));  
+strcpy(str, argv);    
+for(i=0;str[i]!='\0';i++) { 
+if(str[i]>='A'&&str[i]<='Z'){ 
+str[i]+=32;          
+} else if (str[i]>='a'&&str[i]<='z') {
+str[i]-=32;             
+}
+}
+return str;
+}
+int inputValidation(int args,char *argv[]){
+int i;          
+bool c=false; 
+char str[strlen(argv[1])];  
+strcpy(str,argv[1]);
+if (args != 2)  {   
+fprintf(stderr,"\nUsage: %s <string> or <'string 1,..., string n'> for multiple strings\n", argv[0]);
+exit(Exit_failure); 
+} else {
+for(i=0;i<strlen(str);i++) {
+if(isalpha((int) str[i])){
+c = true;
+} 
+}
+if(c == false){
+printf("\nOops,The string you entered did NOT contain any Alphabet\nRun again,with atleast 1 Alphabet\n\n");
+exit(Exit_failure);
+}
+return (0);
+}    
+}
+int main(int args,char *argv[]) {
+assert(args>1);
+int fd[2*Num_pipes];    
+int len, i;             
+pid_t pid;              
+char parent[strlen(argv[1])];   
+char child[strlen(argv[1])];    
+if(inputValidation(args, argv) == 0) 
+strcpy(parent,argv[1]);    
+for (i=0; i<Num_pipes; ++i)
+{
+if (pipe(fd+(i*2)) < 0)
+{
+perror("Failed to allocate pipes");
+exit(Exit_failure);
+}
+}
+if ((pid = fork()) < 0)
+{
+perror("Failed to fork process");
+return Exit_failure;
+}
+if (pid == 0)
+{
+close(fd[P1_READ]);
+close(fd[P1_WRITE]);
+pid = getpid();
+len = read(fd[P2_READ], &child, len);
+if (len < 0)
+{
+perror("Child:Failed to read data from pipe");
+exit(Exit_failure);
+}
+else if (len == 0)
+{
+fprintf(stderr,"Child:Read Eof from pipe");
+}
+else
+{
+printf("Child(%d):Message Received\n\nChild(%d):Toggle Case and Send to Parent\n",pid, pid);
+if (write(fd[P2_WRITE], toggleString(child), strlen(child)) < 0)
+{
+perror("Child:Failed to write response value");
+exit(Exit_failure);
+}
+}
+close(fd[P2_READ]);
+close(fd[P2_WRITE]);
+return Exit_success;
+}
+close(fd[P2_READ]);
+close(fd[P2_WRITE]);
+pid = getpid();
+printf("\nParent(%d):Sending %s to Child\n\n", pid, argv[1]);
+if (write(fd[P1_WRITE], argv[1], strlen(argv[1])) != strlen(argv[1]))
+{
+perror("Parent:Failed to send value to child");
+exit(Exit_failure);
+}
+len = read(fd[P1_READ], &parent, strlen(parent));
+if (len < 0)
+{
+perror("Parent:Failed to read value from pipe");
+exit(Exit_failure);
+}
+else if (len == 0)
+{
+fprintf(stderr,"Parent(%d):Read Eof from pipe", pid);
+}
+else
+{
+printf("\nParent(%d):Received %s from Child\n\n", pid, parent);
+}
+close(fd[P1_READ]);
+close(fd[P1_WRITE]);
+wait(NULL);
+return Exit_success;
+}
